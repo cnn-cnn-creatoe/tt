@@ -22,6 +22,7 @@ New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
 $ExcludedDirs = @(
     "\.git\",
     "\.venv\",
+    "\.tools\",
     "\__pycache__\",
     "\.runtime\",
     "\logs\",
