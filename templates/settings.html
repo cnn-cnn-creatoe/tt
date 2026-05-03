@@ -1,120 +1,105 @@
 {% extends "base.html" %}
 
-{% block title %}设置 - Twitter AI 监控系统{% endblock %}
+{% block title %}设置 - {{ app_name }}{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
-            <h1 style="background: linear-gradient(45deg, #667eea, #764ba2, #f093fb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-        <i class="bi bi-motherboard"></i> Neural Configuration
-    </h1>
-    <p style="color: rgba(184, 197, 209, 0.8);">Configure AI systems and monitoring parameters</p>
+        <div class="page-heading d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="brand-title mb-1">设置</h1>
+                <p class="text-muted mb-0">配置推文来源、大模型接口和扫描频率。</p>
+            </div>
+            <a href="{{ url_for('help_page') }}" class="btn btn-outline-primary">
+                <i class="bi bi-question-circle"></i> 帮助
+            </a>
+        </div>
     </div>
 </div>
 
 <div class="row">
-    <!-- Neural Activity Monitor -->
     <div class="col-12 mb-4">
         <div class="card neural-bg">
             <div class="card-header">
-                <h5 class="mb-0 neon-glow" style="color: #00d4ff;">
-                    <i class="bi bi-activity"></i> Neural Activity Monitor
-                </h5>
+                <h5 class="mb-0"><i class="bi bi-activity"></i> 运行状态</h5>
             </div>
             <div class="card-body p-3">
                 <div class="row">
                     <div class="col-md-3">
                         <div class="status-item mb-2">
                             <small class="text-muted">系统状态</small>
-                            <div id="widget-status" class="fw-bold text-light">初始化中...</div>
+                            <div id="widget-status" class="fw-bold text-light">读取中...</div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="status-item mb-2">
                             <small class="text-muted">当前任务</small>
-                            <div id="widget-task" class="fw-bold text-primary">等待指令</div>
+                            <div id="widget-task" class="fw-bold text-primary">等待启动</div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="status-item mb-2">
                             <small class="text-muted">处理总数</small>
-                            <div id="widget-count" class="fw-bold text-success">0 条推文</div>
+                            <div id="widget-count" class="fw-bold text-success">{{ monitoring_status.processed_tweets or 0 }} 条推文</div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="status-item mb-2">
                             <small class="text-muted">最新结果</small>
-                            <div id="widget-result" class="fw-bold text-info">暂无</div>
+                            <div id="widget-result" class="fw-bold text-info">{{ monitoring_status.last_result or "暂无" }}</div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- 进度条 -->
+
                 <div class="progress mt-3" style="height: 6px;">
                     <div id="activity-progress" class="progress-bar bg-gradient" style="width: 0%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
                 </div>
-                
-                <!-- 详细状态信息 -->
+
                 <div class="row mt-3">
                     <div class="col-md-6">
-                        <div class="status-details">
-                            <small class="text-muted d-block">
-                                <i class="bi bi-cpu"></i> 当前状态: <span id="current-status">{{ monitoring_status.current_status or "待机" }}</span>
-                            </small>
-                            {% if monitoring_status.current_account %}
-                            <small class="text-muted d-block">
-                                <i class="bi bi-person"></i> 监控账号: <span id="current-account">{{ monitoring_status.current_account }}</span>
-                            </small>
-                            {% endif %}
-                            {% if monitoring_status.last_result %}
-                            <small class="text-muted d-block">
-                                <i class="bi bi-info-circle"></i> 最新结果: <span id="last-result">{{ monitoring_status.last_result }}</span>
-                            </small>
-                            {% endif %}
-                        </div>
+                        <small class="text-muted d-block">
+                            <i class="bi bi-cpu"></i> 当前状态：<span id="current-status">{{ monitoring_status.current_status or "待机" }}</span>
+                        </small>
+                        <small class="text-muted d-block">
+                            <i class="bi bi-person"></i> 当前账号：<span id="current-account">{{ monitoring_status.current_account or "无" }}</span>
+                        </small>
                     </div>
                     <div class="col-md-6">
-                        <!-- 下次检查倒计时 -->
-                        <div id="countdown-container" class="text-center" style="display: none;">
-                            <small class="text-muted">
-                                <i class="bi bi-clock"></i> 下次扫描: <span id="countdown-timer" class="text-primary">00:00</span>
+                        <div id="countdown-container" style="display: none;">
+                            <small class="text-muted d-block">
+                                <i class="bi bi-clock"></i> 下次扫描：<span id="countdown-timer" class="text-primary">00:00</span>
                             </small>
                         </div>
-                        {% if monitoring_status.next_check_time %}
                         <small class="text-muted d-block">
-                            <i class="bi bi-clock"></i> 下次检查: <span id="next-check">{{ monitoring_status.next_check_time[:19].replace('T', ' ') }}</span>
+                            <i class="bi bi-clock-history"></i> 下次检查：<span id="next-check">{{ monitoring_status.next_check_time[:19].replace('T', ' ') if monitoring_status.next_check_time else "暂无" }}</span>
                         </small>
-                        {% endif %}
-                        {% if monitoring_status.last_update %}
                         <small class="text-muted d-block">
-                            <i class="bi bi-arrow-clockwise"></i> 最后更新: <span id="last-update">{{ monitoring_status.last_update[:19].replace('T', ' ') }}</span>
+                            <i class="bi bi-arrow-clockwise"></i> 最后更新：<span id="last-update">{{ monitoring_status.last_update[:19].replace('T', ' ') if monitoring_status.last_update else "暂无" }}</span>
                         </small>
-                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 监控控制面板 -->
-    <div class="col-md-6 mb-4">
+    <div class="col-lg-5 mb-4">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-power"></i> Neural Control Center</h5>
+                <h5 class="mb-0"><i class="bi bi-power"></i> 监控控制</h5>
             </div>
             <div class="card-body">
                 <div class="monitoring-status mb-3 pulse-effect">
                     <div class="d-flex align-items-center mb-2">
                         <span class="badge {% if monitoring_status.running %}bg-success{% else %}bg-danger{% endif %} me-2">
-                            {% if monitoring_status.running %}AI ACTIVE{% else %}OFFLINE{% endif %}
+                            {% if monitoring_status.running %}运行中{% else %}已停止{% endif %}
                         </span>
                         <span id="status-text" class="text-light">
-                            {{ monitoring_status.current_status or "Neural Network Standby" }}
+                            {{ monitoring_status.current_status or "待机中" }}
                         </span>
                     </div>
                     <div class="energy-bar mb-2"></div>
                 </div>
-                
+
                 <div class="d-grid gap-2">
                     <button id="start-monitoring" class="btn btn-success" {% if monitoring_status.running %}disabled{% endif %}>
                         <i class="bi bi-play-fill"></i> 启动监控
@@ -123,61 +108,61 @@
                         <i class="bi bi-stop-fill"></i> 停止监控
                     </button>
                 </div>
-                
+
                 <div id="control-message" class="alert alert-info mt-3" style="display: none;"></div>
             </div>
         </div>
     </div>
 
-    <!-- 配置表单 -->
-    <div class="col-md-6">
+    <div class="col-lg-7">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-cpu"></i> AI System Parameters</h5>
+                <h5 class="mb-0"><i class="bi bi-sliders"></i> 配置参数</h5>
             </div>
             <div class="card-body">
                 <form id="config-form">
-                    <!-- API配置 -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <h6 class="border-bottom pb-2">API 配置</h6>
+                            <h6 class="border-bottom pb-2">接口配置</h6>
                         </div>
                         <div class="col-12 mb-3">
                             <label for="twitter-api-key" class="form-label">
                                 Twitter API Key <span class="text-danger">*</span>
                             </label>
-                            <input type="password" class="form-control" id="twitter-api-key" name="TWITTER_API_KEY" 
+                            <input type="password" class="form-control" id="twitter-api-key" name="TWITTER_API_KEY"
                                    value="{{ config.TWITTER_API_KEY }}" required
                                    placeholder="请输入 TwitterAPI.io 的 API Key">
-                            <div class="form-text">
-                                从 <a href="https://twitterapi.io" target="_blank">TwitterAPI.io</a> 获取 API Key
-                            </div>
+                            <div class="form-text">用于读取 X/Twitter 推文数据，可在 TwitterAPI.io 获取。</div>
                         </div>
                         <div class="col-12 mb-3">
                             <label for="llm-url" class="form-label">
-                                大模型 URL <span class="text-danger">*</span>
+                                大模型接口地址 <span class="text-danger">*</span>
                             </label>
-                            <input type="url" class="form-control" id="llm-url" name="LLM_URL" 
+                            <input type="url" class="form-control" id="llm-url" name="LLM_URL"
                                    value="{{ config.LLM_URL }}" required
-                                   placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
-                            <div class="form-text">
-                                大模型API的基础URL
-                            </div>
+                                   placeholder="例如 https://dashscope.aliyuncs.com/compatible-mode/v1">
+                            <div class="form-text">填写兼容 OpenAI 调用格式的 Base URL。</div>
                         </div>
-                        <div class="col-12 mb-3">
+                        <div class="col-md-6 mb-3">
+                            <label for="llm-model" class="form-label">
+                                大模型名称 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="llm-model" name="LLM_MODEL"
+                                   value="{{ config.LLM_MODEL }}" required
+                                   placeholder="例如 qwen-plus">
+                            <div class="form-text">填写服务商后台开通的模型名称。</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
                             <label for="llm-api-key" class="form-label">
                                 大模型 API Key <span class="text-danger">*</span>
                             </label>
-                            <input type="password" class="form-control" id="llm-api-key" name="LLM_API_KEY" 
+                            <input type="password" class="form-control" id="llm-api-key" name="LLM_API_KEY"
                                    value="{{ config.LLM_API_KEY }}" required
-                                   placeholder="请输入大模型的 API Key">
-                            <div class="form-text">
-                                通义千问或其他兼容OpenAI格式的API Key
-                            </div>
+                                   placeholder="请输入大模型 API Key">
+                            <div class="form-text">AI 解析、翻译和标题生成会使用这个 Key。</div>
                         </div>
                     </div>
 
-                    <!-- 监控配置 -->
                     <div class="row mb-4">
                         <div class="col-12">
                             <h6 class="border-bottom pb-2">监控配置</h6>
@@ -186,45 +171,46 @@
                             <label for="target-accounts" class="form-label">
                                 监控账号 <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control" id="target-accounts" name="TARGET_ACCOUNTS" 
-                                   value="{{ config.TARGET_ACCOUNTS|join(', ') }}" required
-                                   placeholder="OpenAI, elonmusk, github">
+                            <div id="target-accounts-list" class="account-input-list"></div>
+                            <input type="hidden" id="target-accounts" name="TARGET_ACCOUNTS">
+                            <button type="button" class="btn btn-outline-primary account-add-btn" id="add-target-account" title="添加监控账号" aria-label="添加监控账号">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
                             <div class="form-text">
-                                要监控的Twitter账号，多个账号用逗号分隔
+                                每个输入框填写一个账号名，不需要 @。例如
+                                <code>OpenAI</code>
+                                <code>sama</code>
+                                <code>github</code>
                             </div>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="check-interval" class="form-label">
-                                检查间隔（秒）
-                            </label>
-                            <input type="number" class="form-control" id="check-interval" name="CHECK_INTERVAL" 
-                                   value="{{ config.CHECK_INTERVAL }}" min="60" max="3600"
-                                   placeholder="300">
-                            <div class="form-text">
-                                推荐300秒（5分钟），避免API限制
-                            </div>
+                            <label for="check-interval" class="form-label">检查间隔（秒）</label>
+                            <input type="number" class="form-control" id="check-interval" name="CHECK_INTERVAL"
+                                   value="{{ config.CHECK_INTERVAL }}" min="60" max="3600" placeholder="300">
+                            <div class="form-text">两次扫描之间等待多久，建议 300 秒以上。</div>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="initial-hours" class="form-label">
-                                初始回溯时间（小时）
-                            </label>
-                            <input type="number" class="form-control" id="initial-hours" name="INITIAL_HOURS" 
-                                   value="{{ config.INITIAL_HOURS }}" min="1" max="168"
-                                   placeholder="2">
-                            <div class="form-text">
-                                首次启动时回溯多长时间的推文
+                            <label for="initial-hours" class="form-label">初始回溯（小时）</label>
+                            <input type="number" class="form-control" id="initial-hours" name="INITIAL_HOURS"
+                                   value="{{ config.INITIAL_HOURS }}" min="1" max="168" placeholder="2">
+                            <div class="form-text">首次启动时向前查找多长时间内的推文。</div>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="exclude-replies" name="EXCLUDE_REPLIES" {% if config.EXCLUDE_REPLIES %}checked{% endif %}>
+                                <label class="form-check-label" for="exclude-replies">排除回复类推文</label>
                             </div>
+                            <div class="form-text">开启后只跟踪账号主动发布的内容，减少评论回复带来的噪音。</div>
                         </div>
                     </div>
 
-                    <!-- 保存按钮 -->
                     <div class="row">
                         <div class="col-12">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-save"></i> 保存配置
                             </button>
                             <button type="button" class="btn btn-outline-secondary ms-2" id="test-config">
-                                <i class="bi bi-check-circle"></i> 测试配置
+                                <i class="bi bi-check-circle"></i> 检查填写
                             </button>
                         </div>
                     </div>
@@ -235,307 +221,325 @@
         </div>
     </div>
 </div>
-
-<!-- 使用说明 -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-question-circle"></i> 使用说明</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>API Key 获取</h6>
-                        <ul>
-                            <li><strong>Twitter API:</strong> 访问 <a href="https://twitterapi.io" target="_blank">TwitterAPI.io</a> 注册并获取API Key</li>
-                            <li><strong>大模型API:</strong> 访问 <a href="https://dashscope.aliyuncs.com" target="_blank">阿里云通义千问</a> 获取API Key</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>配置建议</h6>
-                        <ul>
-                            <li><strong>检查间隔:</strong> 建议300秒以上，避免API限制</li>
-                            <li><strong>监控账号:</strong> 建议同时监控3-5个账号</li>
-                            <li><strong>回溯时间:</strong> 首次运行建议1-2小时</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// 保存配置
+const initialTargetAccounts = {{ config.TARGET_ACCOUNTS|tojson }};
+const targetAccountsList = document.getElementById('target-accounts-list');
+const targetAccountsField = document.getElementById('target-accounts');
+const addTargetAccountButton = document.getElementById('add-target-account');
+
+function normalizeTargetAccount(value) {
+    return String(value || '')
+        .trim()
+        .replace(/^@+/, '')
+        .replace(/^https?:\/\/(x|twitter)\.com\//i, '')
+        .split(/[/?#]/)[0]
+        .trim();
+}
+
+function getTargetAccountInputs() {
+    return Array.from(targetAccountsList.querySelectorAll('.target-account-input'));
+}
+
+function syncTargetAccountsField() {
+    const seen = new Set();
+    const accounts = [];
+
+    getTargetAccountInputs().forEach(input => {
+        const account = normalizeTargetAccount(input.value);
+        const key = account.toLowerCase();
+        if (account && !seen.has(key)) {
+            seen.add(key);
+            accounts.push(account);
+        }
+    });
+
+    targetAccountsField.value = accounts.join(', ');
+    return accounts;
+}
+
+function createTargetAccountRow(value = '') {
+    const row = document.createElement('div');
+    row.className = 'account-input-row';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'form-control target-account-input';
+    input.placeholder = 'OpenAI';
+    input.value = value;
+
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'btn btn-outline-danger account-remove-btn';
+    removeButton.title = '删除此账号';
+    removeButton.setAttribute('aria-label', '删除此账号');
+    removeButton.innerHTML = '<i class="bi bi-trash"></i>';
+
+    row.appendChild(input);
+    row.appendChild(removeButton);
+    targetAccountsList.appendChild(row);
+    syncTargetAccountsField();
+    return input;
+}
+
+function ensureAccountRow() {
+    if (!getTargetAccountInputs().length) {
+        createTargetAccountRow('');
+    }
+}
+
+function initializeTargetAccounts() {
+    const accounts = Array.isArray(initialTargetAccounts)
+        ? initialTargetAccounts
+        : String(initialTargetAccounts || '').split(',');
+
+    accounts.map(normalizeTargetAccount).filter(Boolean).forEach(createTargetAccountRow);
+    ensureAccountRow();
+    syncTargetAccountsField();
+}
+
+function showConfigMessage(type, message) {
+    const messageDiv = document.getElementById('config-message');
+    messageDiv.style.display = 'block';
+    messageDiv.className = `alert alert-${type} mt-3`;
+    messageDiv.innerHTML = message;
+}
+
+function buildConfigPayload() {
+    const accounts = syncTargetAccountsField();
+    return {
+        TWITTER_API_KEY: document.getElementById('twitter-api-key').value.trim(),
+        LLM_URL: document.getElementById('llm-url').value.trim(),
+        LLM_MODEL: document.getElementById('llm-model').value.trim(),
+        LLM_API_KEY: document.getElementById('llm-api-key').value.trim(),
+        TARGET_ACCOUNTS: accounts,
+        CHECK_INTERVAL: parseInt(document.getElementById('check-interval').value || '300', 10),
+        INITIAL_HOURS: parseInt(document.getElementById('initial-hours').value || '2', 10),
+        EXCLUDE_REPLIES: document.getElementById('exclude-replies').checked
+    };
+}
+
+function validateConfigPayload(config) {
+    if (!config.TWITTER_API_KEY || !config.LLM_URL || !config.LLM_MODEL || !config.LLM_API_KEY) {
+        return '请填写 Twitter API Key、大模型接口地址、模型名称和大模型 API Key。';
+    }
+    if (!config.TARGET_ACCOUNTS.length) {
+        return '请至少添加一个监控账号。';
+    }
+    if (config.CHECK_INTERVAL < 60) {
+        return '检查间隔不能小于 60 秒。';
+    }
+    if (config.INITIAL_HOURS < 1) {
+        return '初始回溯不能小于 1 小时。';
+    }
+    return '';
+}
+
+addTargetAccountButton.addEventListener('click', function() {
+    const input = createTargetAccountRow('');
+    input.focus();
+});
+
+targetAccountsList.addEventListener('input', function(e) {
+    if (e.target.classList.contains('target-account-input')) {
+        syncTargetAccountsField();
+    }
+});
+
+targetAccountsList.addEventListener('focusout', function(e) {
+    if (e.target.classList.contains('target-account-input')) {
+        e.target.value = normalizeTargetAccount(e.target.value);
+        syncTargetAccountsField();
+    }
+});
+
+targetAccountsList.addEventListener('click', function(e) {
+    const removeButton = e.target.closest('.account-remove-btn');
+    if (!removeButton) return;
+
+    removeButton.closest('.account-input-row').remove();
+    ensureAccountRow();
+    syncTargetAccountsField();
+});
+
+document.getElementById('test-config').addEventListener('click', function() {
+    const config = buildConfigPayload();
+    const error = validateConfigPayload(config);
+    if (error) {
+        showConfigMessage('danger', '<i class="bi bi-exclamation-triangle"></i> ' + error);
+    } else {
+        showConfigMessage('success', '<i class="bi bi-check-circle"></i> 必填项已填写。保存后启动监控即可验证接口是否可用。');
+    }
+});
+
 document.getElementById('config-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    
-    const formData = new FormData(this);
-    const config = {};
-    
-    for (let [key, value] of formData) {
-        if (key === 'TARGET_ACCOUNTS') {
-            config[key] = value.split(',').map(s => s.trim()).filter(s => s);
-        } else if (key === 'CHECK_INTERVAL' || key === 'INITIAL_HOURS') {
-            config[key] = parseInt(value);
-        } else {
-            config[key] = value;
-        }
+
+    const config = buildConfigPayload();
+    const error = validateConfigPayload(config);
+    if (error) {
+        showConfigMessage('danger', '<i class="bi bi-exclamation-triangle"></i> ' + error);
+        getTargetAccountInputs()[0]?.focus();
+        return;
     }
-    
+
     fetch('/api/save_config', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(config)
     })
     .then(response => response.json())
     .then(data => {
-        const messageDiv = document.getElementById('config-message');
-        messageDiv.style.display = 'block';
-        if (data.success) {
-            messageDiv.className = 'alert alert-success mt-3';
-            messageDiv.innerHTML = '<i class="bi bi-check-circle"></i> ' + data.message;
-        } else {
-            messageDiv.className = 'alert alert-danger mt-3';
-            messageDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + data.message;
-        }
+        showConfigMessage(data.success ? 'success' : 'danger',
+            `<i class="bi ${data.success ? 'bi-check-circle' : 'bi-exclamation-triangle'}"></i> ${data.message}`);
     })
     .catch(error => {
         console.error('保存配置失败:', error);
-        const messageDiv = document.getElementById('config-message');
-        messageDiv.style.display = 'block';
-        messageDiv.className = 'alert alert-danger mt-3';
-        messageDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> 保存配置失败';
+        showConfigMessage('danger', '<i class="bi bi-exclamation-triangle"></i> 保存配置失败');
     });
 });
 
-// 启动监控
 document.getElementById('start-monitoring').addEventListener('click', function() {
     const btn = this;
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 启动中...';
-    
-    fetch('/api/start_monitoring', {
-        method: 'POST'
-    })
-    .then(response => response.json())
-    .then(data => {
-        const messageDiv = document.getElementById('control-message');
-        messageDiv.style.display = 'block';
-        
-        if (data.success) {
-            messageDiv.className = 'alert alert-success mt-3';
-            messageDiv.innerHTML = '<i class="bi bi-check-circle"></i> ' + data.message;
-            
-            // 更新按钮状态
-            btn.disabled = true;
-            document.getElementById('stop-monitoring').disabled = false;
-            
-                            // 更新状态显示
-                setTimeout(() => {
-                    fetch('/api/monitoring_status')
-                        .then(response => response.json())
-                        .then(data => updateMonitoringStatus(data))
-                        .catch(error => console.error('获取状态失败:', error));
-                }, 1000);
-        } else {
-            messageDiv.className = 'alert alert-danger mt-3';
-            messageDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + data.message;
+
+    fetch('/api/start_monitoring', {method: 'POST'})
+        .then(response => response.json())
+        .then(data => {
+            const messageDiv = document.getElementById('control-message');
+            messageDiv.style.display = 'block';
+            messageDiv.className = `alert alert-${data.success ? 'success' : 'danger'} mt-3`;
+            messageDiv.innerHTML = `<i class="bi ${data.success ? 'bi-check-circle' : 'bi-exclamation-triangle'}"></i> ${data.message}`;
+
+            if (data.success) {
+                document.getElementById('stop-monitoring').disabled = false;
+                refreshMonitoringStatus();
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-play-fill"></i> 启动监控';
+            }
+        })
+        .catch(error => {
+            console.error('启动监控失败:', error);
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-play-fill"></i> 启动监控';
-        }
-    })
-    .catch(error => {
-        console.error('启动监控失败:', error);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-play-fill"></i> 启动监控';
-    });
+        });
 });
 
-// 停止监控
 document.getElementById('stop-monitoring').addEventListener('click', function() {
     const btn = this;
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 停止中...';
-    
-    fetch('/api/stop_monitoring', {
-        method: 'POST'
-    })
-    .then(response => response.json())
-    .then(data => {
-        const messageDiv = document.getElementById('control-message');
-        messageDiv.style.display = 'block';
-        messageDiv.className = 'alert alert-info mt-3';
-        messageDiv.innerHTML = '<i class="bi bi-info-circle"></i> ' + data.message;
-        
-        // 更新按钮状态
-        btn.disabled = true;
-        document.getElementById('start-monitoring').disabled = false;
-        
-        // 更新状态显示
-        setTimeout(() => {
-            fetch('/api/monitoring_status')
-                .then(response => response.json())
-                .then(data => updateMonitoringStatus(data))
-                .catch(error => console.error('获取状态失败:', error));
-        }, 1000);
-    })
-    .catch(error => {
-        console.error('停止监控失败:', error);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-stop-fill"></i> 停止监控';
-    });
+
+    fetch('/api/stop_monitoring', {method: 'POST'})
+        .then(response => response.json())
+        .then(data => {
+            const messageDiv = document.getElementById('control-message');
+            messageDiv.style.display = 'block';
+            messageDiv.className = 'alert alert-info mt-3';
+            messageDiv.innerHTML = '<i class="bi bi-info-circle"></i> ' + data.message;
+
+            document.getElementById('start-monitoring').disabled = false;
+            document.getElementById('start-monitoring').innerHTML = '<i class="bi bi-play-fill"></i> 启动监控';
+            refreshMonitoringStatus();
+        })
+        .catch(error => {
+            console.error('停止监控失败:', error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-stop-fill"></i> 停止监控';
+        });
 });
 
-// 更新监控状态显示
 function updateMonitoringStatus(data) {
     const statusBadge = document.querySelector('.monitoring-status .badge');
     const statusText = document.getElementById('status-text');
-    
+    const startButton = document.getElementById('start-monitoring');
+    const stopButton = document.getElementById('stop-monitoring');
+
     if (data.running) {
         statusBadge.className = 'badge bg-success me-2';
-        statusBadge.textContent = 'AI ACTIVE';
-        statusText.textContent = data.current_status || 'Neural Network Active';
+        statusBadge.textContent = '运行中';
+        statusText.textContent = data.current_status || '运行中';
+        startButton.disabled = true;
+        startButton.innerHTML = '<i class="bi bi-play-fill"></i> 启动监控';
+        stopButton.disabled = false;
+        stopButton.innerHTML = '<i class="bi bi-stop-fill"></i> 停止监控';
     } else {
         statusBadge.className = 'badge bg-danger me-2';
-        statusBadge.textContent = 'OFFLINE';
-        statusText.textContent = 'Neural Network Offline';
+        statusBadge.textContent = '已停止';
+        statusText.textContent = data.current_status || '已停止';
+        startButton.disabled = false;
+        startButton.innerHTML = '<i class="bi bi-play-fill"></i> 启动监控';
+        stopButton.disabled = true;
+        stopButton.innerHTML = '<i class="bi bi-stop-fill"></i> 停止监控';
     }
-    
-    // 更新详细状态
-    const updateElement = (id, value) => {
-        const element = document.getElementById(id);
-        if (element && value) {
-            element.textContent = value;
-        }
-    };
-    
-    updateElement('current-status', data.current_status);
-    updateElement('current-account', data.current_account);
-    updateElement('processed-count', data.processed_tweets || 0);
-    updateElement('last-result', data.last_result);
-    
-    if (data.next_check_time) {
-        updateElement('next-check', new Date(data.next_check_time).toLocaleString('zh-CN'));
-    }
-    
-    if (data.last_update) {
-        updateElement('last-update', new Date(data.last_update).toLocaleString('zh-CN'));
-    }
+
+    updateElement('current-status', data.current_status || '待机');
+    updateElement('current-account', data.current_account || '无');
+    updateElement('next-check', formatLocalTime(data.next_check_time));
+    updateElement('last-update', formatLocalTime(data.last_update));
 }
 
-// 显示/隐藏密码
-document.querySelectorAll('input[type="password"]').forEach(function(input) {
-    // 检查是否已经有切换按钮
-    if (input.parentNode.querySelector('.password-toggle')) return;
-    
-    const toggleBtn = document.createElement('button');
-    toggleBtn.type = 'button';
-    toggleBtn.className = 'btn btn-outline-secondary password-toggle';
-    toggleBtn.innerHTML = '<i class="bi bi-eye"></i>';
-    toggleBtn.style.position = 'absolute';
-    toggleBtn.style.right = '10px';
-    toggleBtn.style.top = '50%';
-    toggleBtn.style.transform = 'translateY(-50%)';
-    toggleBtn.style.zIndex = '10';
-    toggleBtn.style.border = 'none';
-    toggleBtn.style.background = 'transparent';
-    
-    input.parentNode.style.position = 'relative';
-    input.parentNode.appendChild(toggleBtn);
-    input.style.paddingRight = '50px';
-    
-    toggleBtn.addEventListener('click', function() {
-        if (input.type === 'password') {
-            input.type = 'text';
-            this.innerHTML = '<i class="bi bi-eye-slash"></i>';
-        } else {
-            input.type = 'password';
-            this.innerHTML = '<i class="bi bi-eye"></i>';
-        }
-    });
-});
-
-// 状态组件更新函数
 function updateStatusWidget(data) {
+    updateElement('widget-status', data.running ? '运行中' : '已停止');
+    updateElement('widget-task', data.current_status || '待机中');
+    updateElement('widget-count', (data.processed_tweets || 0) + ' 条推文');
+    updateElement('widget-result', data.last_result || '暂无');
+
     const statusEl = document.getElementById('widget-status');
-    const taskEl = document.getElementById('widget-task');
-    const countEl = document.getElementById('widget-count');
-    const resultEl = document.getElementById('widget-result');
-    const progressEl = document.getElementById('activity-progress');
-    
     if (statusEl) {
-        statusEl.textContent = data.running ? 'Neural Network Active' : 'Offline';
         statusEl.className = data.running ? 'fw-bold text-success' : 'fw-bold text-danger';
     }
-    
-    if (taskEl) {
-        taskEl.textContent = data.current_status || '待机中';
-    }
-    
-    if (countEl) {
-        countEl.textContent = (data.processed_tweets || 0) + ' 条推文';
-    }
-    
-    if (resultEl) {
-        resultEl.textContent = data.last_result || '暂无';
-    }
-    
-    // 更新进度条
+
+    const progressEl = document.getElementById('activity-progress');
     if (progressEl) {
         let progress = 0;
         if (data.running) {
-            if (data.current_status && data.current_status.includes('处理中')) {
-                progress = 75;
-            } else if (data.current_status && data.current_status.includes('扫描')) {
-                progress = 50;
-            } else if (data.current_status && data.current_status.includes('待机')) {
-                progress = 25;
-            } else {
-                progress = 100;
-            }
+            const currentStatus = data.current_status || '';
+            if (currentStatus.includes('处理')) progress = 75;
+            else if (currentStatus.includes('扫描') || currentStatus.includes('抓取')) progress = 50;
+            else if (currentStatus.includes('待机')) progress = 25;
+            else progress = 100;
         }
         progressEl.style.width = progress + '%';
     }
-    
-    // 更新倒计时
+
     updateCountdown(data.next_check_time);
 }
 
-// 倒计时功能
 function updateCountdown(nextCheckTime) {
     const countdownContainer = document.getElementById('countdown-container');
     const countdownTimer = document.getElementById('countdown-timer');
-    
     if (!nextCheckTime) {
-        if (countdownContainer) countdownContainer.style.display = 'none';
+        countdownContainer.style.display = 'none';
         return;
     }
-    
-    const nextCheck = new Date(nextCheckTime);
-    const now = new Date();
-    const diff = nextCheck - now;
-    
-    if (diff > 0 && countdownContainer) {
+
+    const diff = new Date(nextCheckTime) - new Date();
+    if (diff > 0) {
         countdownContainer.style.display = 'block';
         const minutes = Math.floor(diff / 60000);
         const seconds = Math.floor((diff % 60000) / 1000);
-        
-        if (countdownTimer) {
-            countdownTimer.textContent = minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
-        }
-    } else if (countdownContainer) {
+        countdownTimer.textContent = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+    } else {
         countdownContainer.style.display = 'none';
     }
 }
 
-// 定期更新监控状态和组件
-setInterval(function() {
+function formatLocalTime(value) {
+    if (!value) return '暂无';
+    return new Date(value).toLocaleString('zh-CN', {hour12: false});
+}
+
+function updateElement(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+}
+
+function refreshMonitoringStatus() {
     fetch('/api/monitoring_status')
         .then(response => response.json())
         .then(data => {
@@ -543,6 +547,10 @@ setInterval(function() {
             updateStatusWidget(data);
         })
         .catch(error => console.error('获取状态失败:', error));
-}, 2000);
+}
+
+initializeTargetAccounts();
+refreshMonitoringStatus();
+setInterval(refreshMonitoringStatus, 2000);
 </script>
-{% endblock %} 
+{% endblock %}

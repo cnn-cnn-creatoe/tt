@@ -1,168 +1,136 @@
-# Twitter AI 监控系统
+# AI News 推文监控与 AI 解析系统
 
-这是一个集成了AI功能和Web界面的Twitter推文监控系统，可以实时监控指定账号的新推文，并使用AI对推文进行翻译、解读和标题生成。
+版本：v1.0
+作者：nan
+邮箱：3236606446@qq.com
 
-## 功能特点
+这是一个基于 Flask 的 X/Twitter 推文监控工具。系统会按配置抓取指定账号的新推文，并调用兼容 OpenAI 格式的大模型接口生成中文标题、翻译和解读，最后通过网页界面展示。
 
-### 核心功能
-- 🔍 **实时监控**: 定时检查指定Twitter账号的新推文
-- 🤖 **AI处理**: 对每条推文进行翻译、深度解读和标题生成
-- 💾 **数据存储**: 自动保存处理结果到JSON文件（按天存储）
-- ⚡ **多账号支持**: 可同时监控多个Twitter账号
-- 🛡️ **错误处理**: 包含完善的错误处理和API限流保护
-- 🚫 **过滤功能**: 可选择是否排除回复类推文
+## 主要功能
 
-### Web界面功能
-- 🌐 **可视化界面**: 基于Flask的现代化Web界面
-- 📋 **卡片展示**: 以卡片形式展示推文标题、翻译内容、作者和时间
-- 🔍 **筛选功能**: 支持按作者和发布时间筛选推文
-- 📖 **详情页面**: 点击卡片查看完整的AI翻译、解读和原文链接
-- ⚙️ **设置中心**: 可视化配置API密钥和监控参数
-- 📊 **监控控制**: 启动/停止监控，实时查看运行状态
-- 🕒 **时区转换**: 自动将UTC时间转换为北京时间显示
+- 监控多个 X/Twitter 账号
+- 支持排除回复类推文
+- 调用大模型生成标题、翻译和解读
+- 推文数据按日期保存到本地 `data/`
+- 提供首页、详情页、设置页和帮助页
+- Windows 支持一键启动、后台运行、一键关闭
 
-## 快速开始
+## 快速启动
 
+在 Windows 电脑上双击：
 
-
-#### 通用Python脚本
-1. **安装依赖包**：
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. **启动Web界面**：
-```bash
-python start.py
+```bat
+start.bat
 ```
 
+脚本会自动完成这些事：
 
+- 检查 Python 环境
+- 如果没有 Python，会尝试通过 `winget` 安装 Python 3.12
+- 创建本项目专用虚拟环境 `.venv`
+- 缺少依赖时自动安装 `requirements.txt`
+- 如果没有 `config.json`，自动从 `config.example.json` 生成一份本地配置
+- 后台启动网站服务
+- 自动打开 `http://127.0.0.1:5000`
+- 启动完成后关闭命令行窗口
 
-3. **访问系统**：
-   打开浏览器访问 `http://localhost:5000`
+停止服务时双击：
 
-## 使用指南
-
-### 首次配置
-
-1. 访问 `http://localhost:5000/settings` 设置页面
-2. 填入以下配置：
-   - **Twitter API Key**: 从 [TwitterAPI.io](https://twitterapi.io) 获取
-   - **大模型URL**: `https://dashscope.aliyuncs.com/compatible-mode/v1`
-   - **大模型API Key**: 从 [阿里云通义千问](https://dashscope.aliyuncs.com) 获取
-   - **监控账号**: 如 `OpenAI, elonmusk, github`
-   - **检查间隔**: 建议300秒（5分钟）
-   - **回溯时间**: 首次运行建议1-2小时
-   - **是否排除回复**: 选择是否监控回复类推文
-
-3. 点击"保存配置"
-4. 点击"启动监控"
-
-### 主要功能
-
-#### 首页
-- 查看所有监控到的推文卡片
-- 使用筛选器按作者或日期筛选
-- 点击卡片进入详情页
-
-#### 推文详情页
-- 查看AI生成的标题
-- 阅读AI翻译的中文内容
-- 了解AI深度解读分析
-- 查看原文和链接到Twitter
-
-#### 设置页面
-- 配置API密钥和参数
-- 控制监控的启动和停止
-- 查看监控运行状态
-
-## 文件结构
-
-```
-AI-NES/
-├── app.py                    # Flask主应用
-├── twitter_ai_monitor.py     # 核心监控逻辑
-├── start.py                  # Python启动脚本
-├── run.bat                   # Windows启动脚本
-├── run.sh                    # Linux/Mac启动脚本
-├── requirements.txt          # 依赖包列表
-├── config.json               # 配置文件（自动生成）
-├── clean_duplicates.py       # 数据去重工具
-├── llm.py                    # 大模型调用接口
-├── tweets.py                 # 基础推文获取模块
-├── templates/                # HTML模板
-│   ├── base.html
-│   ├── index.html
-│   ├── tweet_detail.html
-│   ├── settings.html
-│   └── status_widget.html
-├── static/                   # 静态资源
-│   ├── css/style.css
-│   └── js/app.js
-└── data/                     # 数据存储目录
-    └── tweets_YYYY-MM-DD.json
+```bat
+end.bat
 ```
 
-## 数据存储
+`end.bat` 会关闭本项目启动的后台服务，并清理 PID 记录。
 
-- 推文数据按天存储在 `data/` 目录下
-- 文件格式：`tweets_YYYY-MM-DD.json`
-- 每条推文包含：
-  - 作者、发布时间、原文
-  - AI标题、翻译、解读
-  - 推文链接和处理时间
-- 自动备份和去重功能，保证数据完整性
+## 首次配置
 
-## API要求
+打开网站后进入「设置」页面，填写：
 
-- **TwitterAPI.io**: 用于获取Twitter推文数据
-- **阿里云通义千问**: 用于AI翻译、解读和标题生成
+- `Twitter API Key`：用于从 TwitterAPI.io 获取推文
+- `大模型接口地址`：兼容 OpenAI 调用格式的 Base URL，例如 `https://dashscope.aliyuncs.com/compatible-mode/v1`
+- `大模型名称`：例如 `qwen-plus`
+- `大模型 API Key`：用于 AI 翻译、标题和解读
+- `监控账号`：每行或每个输入框填写一个账号名，不需要 `@`
+- `检查间隔`：建议 300 秒或更高
+- `初始回溯`：首次启动时向前抓取多少小时内的推文
 
-## 注意事项
+保存配置后点击「启动监控」即可开始抓取和分析。
 
-- 建议检查间隔设置为300秒或以上，避免API限制
-- 确保API密钥有效且有足够的调用额度
-- Web界面支持Chrome、Firefox、Safari等现代浏览器
-- 系统会自动创建必要的目录和配置文件
-- 数据文件支持自动去重，避免重复存储相同推文
+## 迁移到其他电脑
 
-## 故障排除
+推荐使用项目根目录里的：
 
-### 常见问题
-
-1. **无法启动Web服务**
-   - 检查端口5000是否被占用
-   - 确认Flask已正确安装
-
-2. **API调用失败**
-   - 检查API密钥是否正确
-   - 确认网络连接正常
-   - 检查API调用额度
-
-3. **无法获取推文**
-   - 确认TwitterAPI.io密钥有效
-   - 检查监控的账号名称是否正确
-
-4. **AI处理失败**
-   - 检查大模型API配置
-   - 确认有足够的调用额度
-
-### 数据维护
-
-如需清理重复数据，可运行：
-```bash
-python clean_duplicates.py
+```bat
+package.bat
 ```
 
-### 技术支持
+它会生成：
 
-如遇到问题，请检查：
-- Python版本（建议3.7+）
-- 依赖包是否正确安装
-- 配置文件是否正确
-- 网络连接和防火墙设置
+```text
+dist/AI-News-v1.0.zip
+```
 
-## 更新日志
+迁移包不会包含真实密钥、虚拟环境、日志、运行缓存和本地推文数据。迁移到另一台 Windows 电脑后，解压项目并双击 `start.bat` 即可自动配置并启动。
 
-- **v2.1**: 增加数据去重功能、排除回复选项、北京时间显示
-- **v2.0**: 新增Web界面、数据存储、可视化配置
-- **v1.0**: 基础命令行监控功能 
+## 配置和密钥说明
+
+真实配置文件是：
+
+```text
+config.json
+```
+
+这个文件只保存在本机，不会提交到 GitHub。仓库中只保留：
+
+```text
+config.example.json
+```
+
+如果换电脑运行，第一次启动会自动生成新的 `config.json`，然后在网页设置页重新填写密钥即可。
+
+## 常用文件
+
+```text
+app.py                    Flask 主应用
+twitter_ai_monitor.py     推文抓取与 AI 处理逻辑
+tweets.py                 推文接口辅助模块
+llm.py                    大模型调用辅助模块
+templates/                页面模板
+static/                   前端样式和脚本
+requirements.txt          Python 依赖
+start.bat                 Windows 一键配置并后台启动
+end.bat                   Windows 一键关闭后台服务
+package.bat               生成迁移压缩包
+config.example.json       配置模板，不含密钥
+data/                     本地推文数据目录
+logs/                     本地运行日志目录
+```
+
+## 故障排查
+
+如果 `start.bat` 启动失败，请查看：
+
+```text
+logs/install.log
+logs/server.err.log
+logs/server.out.log
+```
+
+常见原因：
+
+- Python 未安装且当前系统没有 `winget`
+- 网络无法下载依赖
+- 5000 端口被其他程序占用
+- API Key、Base URL 或模型名称填写错误
+
+端口被占用时，先运行 `end.bat`。如果仍然占用，请关闭其他使用 5000 端口的程序，或修改 `start.bat` 中的 `PORT`。
+
+## 发布记录
+
+### v1.0
+
+- 增加 Windows 一键配置和后台启动
+- 增加 `end.bat` 一键停止后台服务
+- 增加迁移包生成脚本
+- 将真实密钥配置排除出 GitHub
+- 补充完整使用教程和项目说明

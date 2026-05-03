@@ -49,7 +49,10 @@ def main():
     try:
         # 导入并运行Flask应用
         from app import app
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        host = os.environ.get('HOST', '127.0.0.1')
+        port = int(os.environ.get('PORT', '5000'))
+        debug = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes', 'on')
+        app.run(debug=debug, host=host, port=port, use_reloader=False)
     except KeyboardInterrupt:
         print("\n\n服务已停止")
     except Exception as e:
@@ -57,4 +60,4 @@ def main():
         print("请检查配置是否正确")
 
 if __name__ == "__main__":
-    main() 
+    main()

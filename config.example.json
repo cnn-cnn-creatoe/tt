@@ -1,0 +1,12 @@
+{
+  "TWITTER_API_KEY": "",
+  "LLM_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "LLM_MODEL": "qwen-plus",
+  "LLM_API_KEY": "",
+  "TARGET_ACCOUNTS": [
+    "OpenAI"
+  ],
+  "CHECK_INTERVAL": 300,
+  "INITIAL_HOURS": 2,
+  "EXCLUDE_REPLIES": false
+}

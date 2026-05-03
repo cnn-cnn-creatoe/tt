@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}帮助 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="page-heading mb-4">
+            <h1 class="brand-title mb-1">帮助</h1>
+            <p class="text-muted mb-0">这里说明软件怎么用、怎么配置，以及常见名词是什么意思。</p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-play-circle"></i> 使用方法</h5>
+            </div>
+            <div class="card-body">
+                <ol class="help-list">
+                    <li>进入“设置”，填写 Twitter API Key、大模型接口地址、大模型名称和大模型 API Key。</li>
+                    <li>在“监控账号”里添加要追踪的 X/Twitter 用户名，每个输入框写一个账号，不需要填写 @。</li>
+                    <li>保存配置后点击“启动监控”。系统会按设置的回溯时间先抓取历史推文，再按检查间隔持续扫描。</li>
+                    <li>回到首页查看推文卡片。卡片右上角显示这篇推文的发布时间，底部显示系统处理时间。</li>
+                    <li>点击任意推文卡片可以进入详情页，查看 AI 翻译、AI 解读、原文和原推文链接。</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-sliders"></i> 配置方法</h5>
+            </div>
+            <div class="card-body">
+                <div class="help-section">
+                    <h6>Twitter API Key</h6>
+                    <p>用于从 TwitterAPI.io 获取推文数据。这个 Key 只负责“抓推文”，不负责 AI 解析。</p>
+                </div>
+                <div class="help-section">
+                    <h6>大模型接口地址</h6>
+                    <p>也叫 Base URL，填写兼容 OpenAI 调用格式的接口地址，例如通义千问兼容模式的接口地址。</p>
+                </div>
+                <div class="help-section">
+                    <h6>大模型名称</h6>
+                    <p>填写你在服务商后台开通的模型名，例如 qwen-plus。模型名写错时，AI 解析会失败。</p>
+                </div>
+                <div class="help-section">
+                    <h6>大模型 API Key</h6>
+                    <p>用于 AI 翻译、AI 解读和标题生成。首页出现“AI处理失败”时，最常见原因就是这个 Key 无效、过期或额度不足。</p>
+                </div>
+                <div class="help-section">
+                    <h6>监控账号</h6>
+                    <p>要追踪的 X/Twitter 用户名。可以填 <code>OpenAI</code>，也可以粘贴主页链接，系统会自动整理成账号名。</p>
+                </div>
+                <div class="help-section">
+                    <h6>检查间隔</h6>
+                    <p>系统每隔多少秒扫描一次新推文。建议 300 秒或更长，避免触发接口频率限制。</p>
+                </div>
+                <div class="help-section">
+                    <h6>初始回溯</h6>
+                    <p>首次启动监控时，系统向前查找多少小时内的推文。例如设置 2 小时，会先抓取最近 2 小时发布的推文。</p>
+                </div>
+                <div class="help-section">
+                    <h6>排除回复类推文</h6>
+                    <p>开启后会尽量跳过账号回复别人时发出的内容，只保留更像“主动发布”的推文。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-wrench"></i> 常见问题</h5>
+            </div>
+            <div class="card-body">
+                <div class="help-section">
+                    <h6>推文有了，但 AI 处理失败</h6>
+                    <p>这通常说明推文抓取成功，但大模型配置不可用。请重点检查大模型 API Key、接口地址、模型名称和额度。</p>
+                </div>
+                <div class="help-section">
+                    <h6>首页没有推文</h6>
+                    <p>先确认设置里的监控账号已经保存，然后启动监控。也可以清空首页筛选条件再查看。</p>
+                </div>
+                <div class="help-section">
+                    <h6>日期筛选找不到内容</h6>
+                    <p>首页日期筛选按“推文发布时间”筛选，不按系统处理时间筛选。跨时区时会按北京时间显示和筛选。</p>
+                </div>
+                <a href="{{ url_for('settings') }}" class="btn btn-primary w-100 mt-2">
+                    <i class="bi bi-gear"></i> 去设置
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

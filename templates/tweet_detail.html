@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}推文详情 - Twitter AI 监控系统{% endblock %}
+{% block title %}推文详情 - {{ app_name }}{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <nav aria-label="breadcrumb">
+        <nav aria-label="面包屑导航">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ url_for('index') }}">首页</a></li>
                 <li class="breadcrumb-item active">推文详情</li>
@@ -18,12 +18,12 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-center gap-3">
                     <div class="d-flex align-items-center">
                         <i class="bi bi-person-circle me-2 fs-4"></i>
                         <div>
                             <h5 class="mb-0">{{ tweet.author }}</h5>
-                            <small class="text-muted">{{ tweet.created_at }}</small>
+                            <small class="text-muted">{{ "发布时间：" ~ tweet.published_time if tweet.published_time else "发布时间未知" }}</small>
                         </div>
                     </div>
                     <a href="{{ tweet.tweet_url }}" target="_blank" class="btn btn-outline-primary btn-sm">
@@ -32,34 +32,36 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- AI生成的标题 -->
+                {% if tweet.ai_failed %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    推文已抓取成功，但 AI 解析未完成。请到设置页检查大模型 API Key、接口地址、模型名称和调用额度。
+                </div>
+                {% endif %}
                 <div class="mb-4">
                     <h4 class="text-primary">
-                        <i class="bi bi-lightbulb-fill"></i> {{ tweet.ai_title }}
+                        <i class="bi bi-lightbulb-fill"></i> {{ tweet.display_title }}
                     </h4>
                 </div>
 
-                <!-- AI翻译 -->
                 <div class="mb-4">
                     <h5 class="border-bottom pb-2">
                         <i class="bi bi-translate"></i> AI翻译
                     </h5>
                     <div class="content-box p-3 rounded">
-                        <p class="mb-0">{{ tweet.ai_translation }}</p>
+                        <p class="mb-0">{{ tweet.display_translation }}</p>
                     </div>
                 </div>
 
-                <!-- AI解读 -->
                 <div class="mb-4">
                     <h5 class="border-bottom pb-2">
                         <i class="bi bi-chat-text"></i> AI解读
                     </h5>
                     <div class="content-box p-3 rounded">
-                        <p class="mb-0" style="white-space: pre-line;">{{ tweet.ai_analysis }}</p>
+                        <p class="mb-0" style="white-space: pre-line;">{{ tweet.display_analysis }}</p>
                     </div>
                 </div>
 
-                <!-- 原文 -->
                 <div class="mb-4">
                     <h5 class="border-bottom pb-2">
                         <i class="bi bi-file-text"></i> 原文
@@ -69,7 +71,6 @@
                     </div>
                 </div>
 
-                <!-- 处理信息 -->
                 <div class="row">
                     <div class="col-md-6">
                         <div class="card info-card">
@@ -78,9 +79,10 @@
                                     <i class="bi bi-info-circle"></i> 处理信息
                                 </h6>
                                 <ul class="list-unstyled mb-0">
-                                    <li><strong>推文ID:</strong> {{ tweet.id }}</li>
-                                    <li><strong>处理时间:</strong> {{ tweet.timestamp[:19].replace('T', ' ') if tweet.timestamp else '' }}</li>
-                                    <li><strong>处理日期:</strong> {{ tweet.processed_date }}</li>
+                                    <li><strong>推文ID：</strong>{{ tweet.id }}</li>
+                                    <li><strong>发布时间：</strong>{{ tweet.published_time or "未知" }}</li>
+                                    <li><strong>处理时间：</strong>{{ tweet.processed_time or "未知" }}</li>
+                                    <li><strong>处理日期：</strong>{{ tweet.processed_date }}</li>
                                 </ul>
                             </div>
                         </div>
@@ -108,7 +110,6 @@
     </div>
 </div>
 
-<!-- 返回按钮 -->
 <div class="row mt-3">
     <div class="col-12">
         <a href="{{ url_for('index') }}" class="btn btn-secondary">
@@ -120,13 +121,12 @@
 
 {% block scripts %}
 <script>
-// 复制功能
 function copyToClipboard(text, button) {
     navigator.clipboard.writeText(text).then(function() {
         const originalText = button.innerHTML;
         button.innerHTML = '<i class="bi bi-check"></i> 已复制';
         button.classList.replace('btn-outline-secondary', 'btn-success');
-        
+
         setTimeout(function() {
             button.innerHTML = originalText;
             button.classList.replace('btn-success', 'btn-outline-secondary');
@@ -134,10 +134,9 @@ function copyToClipboard(text, button) {
     });
 }
 
-// 添加复制按钮到各个文本区域
 document.addEventListener('DOMContentLoaded', function() {
     const textAreas = document.querySelectorAll('.content-box');
-    textAreas.forEach(function(area, index) {
+    textAreas.forEach(function(area) {
         const copyBtn = document.createElement('button');
         copyBtn.className = 'btn btn-outline-secondary btn-sm float-end mb-2';
         copyBtn.innerHTML = '<i class="bi bi-clipboard"></i> 复制';
@@ -148,4 +147,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock %} 
+{% endblock %}

@@ -1,7 +1,7 @@
 import requests
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # 从配置文件加载API密钥
 config_file = "config.json"
@@ -11,24 +11,24 @@ with open(config_file, 'r', encoding='utf-8') as f:
 TWITTER_API_KEY = config["TWITTER_API_KEY"]
 
 # 设置时间范围
-since_time = datetime.utcnow() - timedelta(days=2)
-until_time = datetime.utcnow()
-since_str = since_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-until_str = until_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+since_time = datetime.now(timezone.utc) - timedelta(days=2)
+until_time = datetime.now(timezone.utc)
+since_ts = int(since_time.timestamp())
+until_ts = int(until_time.timestamp())
 
 # 测试不同的查询参数
 test_queries = [
     # 原始查询（包含回复）
-    f"from:Google since:{since_str} until:{until_str} include:nativeretweets",
+    f"from:Google since_time:{since_ts} until_time:{until_ts} include:nativeretweets",
     
     # 排除回复的查询
-    f"from:Google -filter:replies since:{since_str} until:{until_str} include:nativeretweets",
+    f"from:Google since_time:{since_ts} until_time:{until_ts} -filter:replies include:nativeretweets",
     
     # 只获取原创推文（不包括转发和回复）
-    f"from:Google -is:reply -is:retweet since:{since_str} until:{until_str}",
+    f"from:Google since_time:{since_ts} until_time:{until_ts} -filter:replies -filter:retweets",
     
     # 只获取原创推文和转发（不包括回复）
-    f"from:Google -is:reply since:{since_str} until:{until_str}"
+    f"from:Google since_time:{since_ts} until_time:{until_ts} -filter:replies"
 ]
 
 # 测试每个查询
@@ -53,4 +53,4 @@ for i, query in enumerate(test_queries):
         else:
             print(f"API请求失败: {response.status_code} - {response.text}")
     except Exception as e:
-        print(f"发生错误: {str(e)}") 
+        print(f"发生错误: {str(e)}")

@@ -1,6 +1,7 @@
+import os
 from openai import OpenAI
 
-def get_model_response(url: str, api_key: str, prompt: str) -> str:
+def get_model_response(url: str, api_key: str, prompt: str, model: str) -> str:
     """
     调用 Qwen 模型返回文字内容
 
@@ -15,7 +16,7 @@ def get_model_response(url: str, api_key: str, prompt: str) -> str:
     )
 
     completion = client.chat.completions.create(
-        model="qwen-plus",
+        model=model,
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt},
@@ -27,11 +28,14 @@ def get_model_response(url: str, api_key: str, prompt: str) -> str:
     # 只返回文字内容
     return completion.choices[0].message.content
 
-# 示例调用
 if __name__ == "__main__":
-    url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    api_key = "sk-bf2a9bsssc"
+    url = os.getenv("LLM_URL", "")
+    api_key = os.getenv("LLM_API_KEY", "")
+    model = os.getenv("LLM_MODEL", "")
     prompt = "你是谁？"
 
-    text = get_model_response(url, api_key, prompt)
+    if not all([url, api_key, model]):
+        raise SystemExit("请先设置 LLM_URL、LLM_API_KEY 和 LLM_MODEL 环境变量")
+
+    text = get_model_response(url, api_key, prompt, model)
     print(text)

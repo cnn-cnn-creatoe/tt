@@ -1,6 +1,24 @@
 import requests
 import time
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+
+def to_unix_seconds(dt: datetime) -> int:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return int(dt.timestamp())
+
+def tweet_created_at_seconds(tweet: dict):
+    created_at = tweet.get("createdAt")
+    if not created_at:
+        return None
+    try:
+        return int(parsedate_to_datetime(created_at).timestamp())
+    except (TypeError, ValueError):
+        return None
 
 def monitor_tweets(api_key: str, target_accounts: list, check_interval: int = 300, hours: int = 1):
     """
@@ -18,21 +36,20 @@ def monitor_tweets(api_key: str, target_accounts: list, check_interval: int = 30
         until_time = datetime.utcnow()
         since_time = last_checked_time
         
-        since_str = since_time.strftime("%Y-%m-%d_%H:%M:%S_UTC")
-        until_str = until_time.strftime("%Y-%m-%d_%H:%M:%S_UTC")
+        since_ts = to_unix_seconds(since_time)
+        until_ts = to_unix_seconds(until_time)
         
         all_tweets = []
         
         for account in target_accounts:
-            query = f"from:{account} since:{since_str} until:{until_str} include:nativeretweets"
             url = "https://api.twitterapi.io/twitter/tweet/advanced_search"
-            params = {"query": query, "queryType": "Latest"}
             headers = {"X-API-Key": api_key}
-            
-            next_cursor = None
-            while True:
-                if next_cursor:
-                    params["cursor"] = next_cursor
+            current_until = until_ts
+            seen_ids = set()
+
+            while current_until > since_ts:
+                query = f"from:{account} since_time:{since_ts} until_time:{current_until} include:nativeretweets"
+                params = {"query": query, "queryType": "Latest"}
                 response = requests.get(url, headers=headers, params=params)
                 if response.status_code == 200:
                     data = response.json()
@@ -40,12 +57,24 @@ def monitor_tweets(api_key: str, target_accounts: list, check_interval: int = 30
                     if tweets:
                         for t in tweets:
                             t['author'] = account  # 添加作者信息
-                        all_tweets.extend(tweets)
-                    if data.get("has_next_page", False) and data.get("next_cursor","") != "":
-                        next_cursor = data.get("next_cursor")
-                        continue
-                    else:
+                            tweet_id = t.get("id") or t.get("id_str")
+                            if tweet_id and tweet_id not in seen_ids:
+                                seen_ids.add(tweet_id)
+                                all_tweets.append(t)
+                    if len(tweets) < 20:
                         break
+
+                    created_times = [
+                        created_ts for created_ts in
+                        (tweet_created_at_seconds(tweet) for tweet in tweets)
+                        if created_ts is not None
+                    ]
+                    if not created_times:
+                        break
+                    next_until = min(created_times) - 1
+                    if next_until >= current_until:
+                        break
+                    current_until = max(next_until, since_ts)
                 else:
                     print(f"错误: {response.status_code} - {response.text}")
                     break
@@ -76,7 +105,9 @@ def monitor_tweets(api_key: str, target_accounts: list, check_interval: int = 30
 
 # 示例调用
 if __name__ == "__main__":
-    API_KEY = "x'x'x'xxxxxee5"
+    API_KEY = os.getenv("TWITTER_API_KEY", "")
+    if not API_KEY:
+        raise SystemExit("请先设置 TWITTER_API_KEY 环境变量")
     TARGET_ACCOUNT = ["OpenAI"]
     CHECK_INTERVAL = 300  # 5 分钟
     HOURS = 70  # 初始回溯 70 小时
