@@ -3,13 +3,23 @@ import time
 import json
 import os
 import sys
+import re
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from openai import OpenAI
 
+AI_FAILURE_MESSAGE = "AI处理失败：大模型调用失败，请检查 API Key、接口地址、模型名称和额度。"
+
+
+def mask_sensitive_text(value) -> str:
+    text = str(value)
+    text = re.sub(r"(sk-[A-Za-z0-9_-]{6})[A-Za-z0-9_-]+", r"\1***", text)
+    text = re.sub(r"(new1_[A-Za-z0-9_-]{6})[A-Za-z0-9_-]+", r"\1***", text)
+    return text
+
 
 def log(*args, sep=" ", end="\n"):
-    text = sep.join(str(arg) for arg in args) + end
+    text = sep.join(mask_sensitive_text(arg) for arg in args) + end
     try:
         sys.stdout.write(text)
         sys.stdout.flush()
@@ -71,74 +81,186 @@ class TwitterAIMonitor:
                 return int(datetime.fromisoformat(created_at.replace("Z", "+00:00")).timestamp())
             except (TypeError, ValueError):
                 return None
-    
-    def get_ai_response(self, prompt: str) -> str:
+
+    @staticmethod
+    def _looks_like_chinese(text: str) -> bool:
+        value = str(text or "")
+        chinese_chars = re.findall(r"[\u4e00-\u9fff]", value)
+        letters = re.findall(r"[A-Za-z]", value)
+        return bool(chinese_chars) and len(chinese_chars) >= max(2, len(letters) // 2)
+
+    @staticmethod
+    def _media_items(value):
+        if not value:
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            if isinstance(value.get("media"), list):
+                return value["media"]
+            if isinstance(value.get("photos"), list):
+                return value["photos"]
+            if isinstance(value.get("images"), list):
+                return value["images"]
+            return [value]
+        return []
+
+    @classmethod
+    def extract_image_urls(cls, tweet: dict) -> list:
+        """Extract image URLs from common TwitterAPI.io response shapes."""
+        candidates = []
+        media_sources = [
+            tweet.get("media"),
+            tweet.get("entities"),
+            tweet.get("extendedEntities"),
+            tweet.get("extended_entities"),
+            tweet.get("attachments"),
+            tweet.get("photos"),
+            tweet.get("images"),
+        ]
+
+        for source in media_sources:
+            for item in cls._media_items(source):
+                if not isinstance(item, dict):
+                    continue
+                media_type = str(item.get("type") or item.get("media_type") or item.get("content_type") or "").lower()
+                if media_type and media_type not in {"photo", "image", "animated_gif", "video"}:
+                    continue
+                for key in ("media_url_https", "media_url", "url", "image_url", "preview_image_url", "thumbnail_url"):
+                    url = item.get(key)
+                    if isinstance(url, str) and url.startswith(("http://", "https://")):
+                        candidates.append(url)
+                if isinstance(item.get("variants"), list):
+                    for variant in item["variants"]:
+                        url = variant.get("url") if isinstance(variant, dict) else None
+                        if isinstance(url, str) and url.startswith(("http://", "https://")) and any(ext in url.lower() for ext in (".jpg", ".jpeg", ".png", ".webp")):
+                            candidates.append(url)
+
+        seen = set()
+        urls = []
+        for url in candidates:
+            clean_url = url.strip()
+            key = clean_url.split("?")[0]
+            if clean_url and key not in seen:
+                seen.add(key)
+                urls.append(clean_url)
+        return urls[:4]
+
+    @staticmethod
+    def _json_from_text(text: str) -> dict:
+        value = str(text or "").strip()
+        if value.startswith("```"):
+            value = re.sub(r"^```(?:json)?\s*", "", value)
+            value = re.sub(r"\s*```$", "", value)
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", value, flags=re.S)
+            if match:
+                return json.loads(match.group(0))
+            raise
+
+    def get_ai_response(self, prompt: str, image_urls: list = None) -> str:
         """
         调用AI模型获取响应
         
         :param prompt: 输入提示词
+        :param image_urls: 可选图片 URL，用于视觉模型读取图片内容
         :return: AI响应内容
         """
-        failure_message = "AI处理失败：请检查大模型 API Key、接口地址和模型名称。"
         if not self.llm_client or not self.llm_model:
-            return failure_message
+            return AI_FAILURE_MESSAGE
+
+        image_urls = image_urls or []
+        user_content = prompt
+        if image_urls:
+            user_content = [{"type": "text", "text": prompt}]
+            user_content.extend(
+                {"type": "image_url", "image_url": {"url": image_url}}
+                for image_url in image_urls
+            )
 
         try:
             completion = self.llm_client.chat.completions.create(
                 model=self.llm_model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt},
+                    {"role": "system", "content": "你是一个中文推文解析助手。只输出用户要求的内容，不要编造事实。"},
+                    {"role": "user", "content": user_content},
                 ]
             )
             return completion.choices[0].message.content
         except Exception as e:
+            if image_urls:
+                log(f"视觉模型调用失败，尝试改用纯文本调用: {e}")
+                text_prompt = prompt + "\n\n图片 URL（如果模型不能直接读取图片，请只按文本内容解析）：\n" + "\n".join(image_urls)
+                try:
+                    completion = self.llm_client.chat.completions.create(
+                        model=self.llm_model,
+                        messages=[
+                            {"role": "system", "content": "你是一个中文推文解析助手。只输出用户要求的内容，不要编造事实。"},
+                            {"role": "user", "content": text_prompt},
+                        ]
+                    )
+                    return completion.choices[0].message.content
+                except Exception as fallback_error:
+                    log(f"AI调用出错: {fallback_error}")
+                    return AI_FAILURE_MESSAGE
+
             log(f"AI调用出错: {e}")
-            return failure_message
-    
-    def process_tweet_with_ai(self, tweet_text: str) -> dict:
+            return AI_FAILURE_MESSAGE
+
+    def process_tweet_with_ai(self, tweet_text: str, image_urls: list = None) -> dict:
         """
         使用AI处理推文：翻译、解读、生成标题
         
         :param tweet_text: 推文内容
+        :param image_urls: 推文图片 URL
         :return: 包含AI处理结果的字典
         """
-        # 翻译推文
-        translate_prompt = f"""请将以下英文推文翻译成中文，保持原意和语气：
+        image_urls = image_urls or []
+        chinese_hint = "这条推文主要是中文，translation 字段直接保留中文原文，可轻微修正明显错别字。" if self._looks_like_chinese(tweet_text) else "如果原文不是中文，请把 translation 字段翻译成自然中文。"
+        image_hint = "推文包含图片。请读取图片中的文字和画面信息，并把有价值的信息纳入标题、翻译和解读。" if image_urls else "推文没有可用图片。"
+        prompt = f"""请处理下面这条 X/Twitter 推文，并只返回一个 JSON 对象。
 
-推文内容：{tweet_text}
+要求：
+1. title：中文标题，10-25 个字，概括核心信息。
+2. translation：中文内容。{chinese_hint}
+3. analysis：中文解读，80-180 字。内容短时就简短解释，不要编造钱包地址、空投规则、项目背景等原文没有的信息。
+4. {image_hint}
+5. 只返回 JSON，不要 Markdown，不要额外说明。
 
-请只返回翻译结果，不要包含其他说明。"""
-        
-        translation = self.get_ai_response(translate_prompt)
-        
-        # 解读推文
-        analysis_prompt = f"""请对以下推文进行深度解读分析，包括其含义、背景、可能的影响等,全文内容在160字左右：
+JSON 格式：
+{{"title":"...","translation":"...","analysis":"..."}}
 
-推文内容：{tweet_text}
+推文原文：
+{tweet_text or "(无文本内容)"}
+"""
 
-请从以下角度进行分析：
-1. 推文的主要信息和观点
-2. 可能的背景和原因
-3. 对相关领域的影响
-4. 其他值得关注的要点
+        response = self.get_ai_response(prompt, image_urls=image_urls)
+        if response.startswith("AI处理失败"):
+            return {
+                'title': "AI处理失败",
+                'translation': response,
+                'analysis': response
+            }
 
-请用中文回答，内容要有深度和见解。"""
-        
-        analysis = self.get_ai_response(analysis_prompt)
-        
-        # 生成标题
-        title_prompt = f"""请为以下推文生成一个简洁有力的中文标题，要求：
-1. 控制在15-25个字以内
-2. 能够准确概括推文的核心内容
-3. 具有吸引力和新闻性
+        try:
+            data = self._json_from_text(response)
+        except Exception as e:
+            log(f"AI返回内容不是有效JSON，使用原始响应兜底: {e}")
+            data = {}
 
-推文内容：{tweet_text}
+        title = str(data.get("title") or "").strip()
+        translation = str(data.get("translation") or "").strip()
+        analysis = str(data.get("analysis") or "").strip()
 
-请只返回标题，不要包含其他内容。"""
-        
-        title = self.get_ai_response(title_prompt)
-        
+        if not translation:
+            translation = tweet_text if self._looks_like_chinese(tweet_text) else response.strip()
+        if not title:
+            title = translation[:24] or "推文解析"
+        if not analysis:
+            analysis = response.strip()
+
         return {
             'title': title.strip(),
             'translation': translation.strip(),
@@ -335,16 +457,19 @@ class TwitterAIMonitor:
                     tweet_id = tweet.get('id') or tweet.get('id_str')
                     tweet_url = f"https://twitter.com/{tweet['author']}/status/{tweet_id}"
                     original_text = tweet.get('text', '')
+                    image_urls = self.extract_image_urls(tweet)
                     
                     log(f"作者：{tweet['author']}")
                     log(f"发布时间：{tweet.get('createdAt')}")
                     log(f"原文：{original_text}")
+                    if image_urls:
+                        log(f"图片：{', '.join(image_urls)}")
                     log(f"链接：{tweet_url}")
                     log()
                     
                     # AI处理
                     log("AI处理中...")
-                    ai_result = self.process_tweet_with_ai(original_text)
+                    ai_result = self.process_tweet_with_ai(original_text, image_urls=image_urls)
                     
                     log(f"AI标题：{ai_result['title']}")
                     log(f"AI翻译：{ai_result['translation']}")
@@ -358,6 +483,7 @@ class TwitterAIMonitor:
                         'created_at': tweet.get('createdAt'),
                         'original_text': original_text,
                         'tweet_url': tweet_url,
+                        'media_urls': image_urls,
                         'ai_title': ai_result['title'],
                         'ai_translation': ai_result['translation'],
                         'ai_analysis': ai_result['analysis'],
@@ -448,13 +574,14 @@ class TwitterAIMonitor:
                     tweet_id = tweet.get('id') or tweet.get('id_str')
                     tweet_url = f"https://twitter.com/{tweet['author']}/status/{tweet_id}"
                     original_text = tweet.get('text', '')
+                    image_urls = self.extract_image_urls(tweet)
                     
                     # 更新状态：AI处理中
                     update_status(f"AI处理中... ({idx}/{len(all_tweets)})", f"@{tweet['author']}")
                     
                     # AI处理
                     try:
-                        ai_result = self.process_tweet_with_ai(original_text)
+                        ai_result = self.process_tweet_with_ai(original_text, image_urls=image_urls)
                     except Exception as e:
                         log(f"AI处理推文失败: {str(e)}")
                         ai_result = {
@@ -470,6 +597,7 @@ class TwitterAIMonitor:
                         'created_at': tweet.get('createdAt'),
                         'original_text': original_text,
                         'tweet_url': tweet_url,
+                        'media_urls': image_urls,
                         'ai_title': ai_result['title'],
                         'ai_translation': ai_result['translation'],
                         'ai_analysis': ai_result['analysis'],
